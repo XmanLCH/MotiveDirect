@@ -1,6 +1,6 @@
 MotiveDirect Unity C#
 ============
-[![GitHub Stars](https://img.shields.io/github/stars/IgorAntun/node-chat.svg)](https://github.com/IgorAntun/node-chat/stargazers) [![GitHub Issues](https://img.shields.io/github/issues/IgorAntun/node-chat.svg)](https://github.com/IgorAntun/node-chat/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/XmanLCH/node-chat.svg)](https://github.com/XmanLCH/node-chat/stargazers) [![GitHub Issues](https://img.shields.io/github/issues/XmanLCH/node-chat.svg)](https://github.com/XmanLCH/node-chat/issues)
 
 This is a NatNet direct client running in Unity written in C# that allows you to receive tracking data sent from the OptiTrack Motive software directly without intermidiate NatNet SDK server or plug-in. Mostly rewritten from PacketClient.cpp in NatNet SDK and [Optirx](https://pypi.python.org/pypi/optirx).
 
