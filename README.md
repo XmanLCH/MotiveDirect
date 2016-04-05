@@ -1,4 +1,4 @@
-MotiveDirect: Direct Unity C# client for Optitrack Motive
+Direct Unity C# client for Optitrack Motive
 ============
 
 This is a NatNet direct client running in Unity written in C# that allows you to receive tracking data sent from the OptiTrack Motive software directly without intermidiate NatNet SDK server or plug-in. Mostly rewritten from PacketClient.cpp in NatNet SDK and [Optirx](https://pypi.python.org/pypi/optirx).
