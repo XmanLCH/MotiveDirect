@@ -34,6 +34,7 @@ public class MotiveDirect : MonoBehaviour {
 	public int dataPort = 1511;
 	public int commandPort = 1510;
 	public string NatNetVersion = "2.7.0.0";
+	public static double currentTimestamp = 0.0f;
 
 	public bool showDebugObject = true;
 
@@ -409,6 +410,7 @@ public class MotiveDirect : MonoBehaviour {
 					dataBufferHead ++;
 					if(dataBufferHead>=dataBufferSize) dataBufferHead = 0;
 					dataBuffer[dataBufferHead] = (FrameOfData)msg;
+					currentTimestamp = ((FrameOfData)msg).timestamp;
 				}
 			}
 		}
@@ -443,8 +445,8 @@ public class MotiveDirect : MonoBehaviour {
 					foreach (ModelDataset dataset in modelDef.datasets){
 						if(dataset.type == DATASET_MARKERSET){
 							int i=0;
-							string uniqueID = dataset.name + i.ToString();
 							foreach(string name in dataset.data){
+								string uniqueID = dataset.name + i.ToString();
 								markerSetIDtoName[uniqueID] = name;
 								i++;
 							}
@@ -486,6 +488,31 @@ public class MotiveDirect : MonoBehaviour {
 		lock(syncLock){
 			if(dataBufferHead !=-1){ // skip if no data comes in
 				FrameOfData msg = dataBuffer[dataBufferHead];
+				foreach(KeyValuePair<string, ArrayList> element in msg.sets){
+					GameObject mSet = GameObject.Find(element.Key + "_set");
+					if(mSet == null) mSet = new GameObject(element.Key + "_set");
+					mSet.transform.parent = transform;
+					int i=0;
+					foreach(Vector3 marker in element.Value){
+						string uniqueID = element.Key + i.ToString();
+						if(markerSetIDtoName.ContainsKey(uniqueID)){
+							GameObject mk = GameObject.Find(markerSetIDtoName[uniqueID]);
+							if(mk == null){ 
+								mk = new GameObject();
+								mk.name = markerSetIDtoName[uniqueID];
+								mk.transform.parent = mSet.transform;
+								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+								debugObject.transform.localScale *= 0.02f;
+								debugObject.transform.parent = mk.transform;
+								debugObject.name = "debug";
+							}
+							mk.transform.localPosition = convertToLeftHandPosition(marker);
+							Transform debugSphere = mk.transform.Find("debug");
+							if(debugSphere != null) debugSphere.GetComponent<Renderer>().enabled = showDebugObject;
+						}
+						i++;
+					}
+				}
 				for(int i=0; i<msg.rigid_bodies.Count; i++){
 					RigidBody rbody = (RigidBody)msg.rigid_bodies[i];
 					if(rigidBodyIDtoName.ContainsKey(rbody.id)){
