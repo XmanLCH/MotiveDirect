@@ -416,12 +416,13 @@ public class MotiveDirect : MonoBehaviour {
 				}
 			}
 			else if(msgtype == NAT_MODELDEF){
-				ModelDefs modelDef = (ModelDefs)msg;
-				markerSetIDtoName.Clear();
-				rigidBodyIDtoName.Clear();
-				skeletonIDtoName.Clear();
-				boneIDtoName.Clear();
-				lock(syncLock){
+                lock(syncLock){
+				    ModelDefs modelDef = (ModelDefs)msg;
+				    markerSetIDtoName.Clear();
+				    rigidBodyIDtoName.Clear();
+				    skeletonIDtoName.Clear();
+				    boneIDtoName.Clear();
+				
 					foreach (ModelDataset dataset in modelDef.datasets){
 						if(dataset.type == DATASET_MARKERSET){
 							int i=0;
