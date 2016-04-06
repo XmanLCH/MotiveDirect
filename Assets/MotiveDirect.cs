@@ -413,6 +413,7 @@ public class MotiveDirect : MonoBehaviour {
 					currentTimestamp = ((FrameOfData)msg).timestamp;
 				}
 			}
+
 		}
 		catch(System.Exception ex)
 		{
@@ -496,10 +497,10 @@ public class MotiveDirect : MonoBehaviour {
 					foreach(Vector3 marker in element.Value){
 						string uniqueID = element.Key + i.ToString();
 						if(markerSetIDtoName.ContainsKey(uniqueID)){
-							GameObject mk = GameObject.Find(markerSetIDtoName[uniqueID]);
+							GameObject mk = GameObject.Find(element.Key + "_" + markerSetIDtoName[uniqueID]);
 							if(mk == null){ 
 								mk = new GameObject();
-								mk.name = markerSetIDtoName[uniqueID];
+								mk.name = element.Key + "_" + markerSetIDtoName[uniqueID];
 								mk.transform.parent = mSet.transform;
 								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 								debugObject.transform.localScale *= 0.02f;
