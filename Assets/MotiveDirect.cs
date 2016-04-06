@@ -1,4 +1,22 @@
-﻿using UnityEngine;
+﻿
+//The MIT License (MIT)
+//Copyright (c) 2016 Lung-Pan Cheng
+//
+//Permission is hereby granted, free of charge, to any person obtaining a copy of this 
+//software and associated documentation files (the "Software"), to deal in the Software 
+//without restriction, including without limitation the rights to use, copy, modify, merge, 
+//publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons 
+//to whom the Software is furnished to do so, subject to the following conditions:
+//
+//The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+//INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+//IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+//WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System;
@@ -416,13 +434,12 @@ public class MotiveDirect : MonoBehaviour {
 				}
 			}
 			else if(msgtype == NAT_MODELDEF){
-                lock(syncLock){
-				    ModelDefs modelDef = (ModelDefs)msg;
-				    markerSetIDtoName.Clear();
-				    rigidBodyIDtoName.Clear();
-				    skeletonIDtoName.Clear();
-				    boneIDtoName.Clear();
-				
+				lock(syncLock){
+					ModelDefs modelDef = (ModelDefs)msg;
+					markerSetIDtoName.Clear();
+					rigidBodyIDtoName.Clear();
+					skeletonIDtoName.Clear();
+					boneIDtoName.Clear();
 					foreach (ModelDataset dataset in modelDef.datasets){
 						if(dataset.type == DATASET_MARKERSET){
 							int i=0;
@@ -474,15 +491,19 @@ public class MotiveDirect : MonoBehaviour {
 					if(rigidBodyIDtoName.ContainsKey(rbody.id)){
 						GameObject rb = GameObject.Find(rigidBodyIDtoName[rbody.id]);
 						if(rb == null){ 
-							rb = GameObject.CreatePrimitive(PrimitiveType.Cube);
+							rb = new GameObject();
 							rb.name = rigidBodyIDtoName[rbody.id];
-							rb.transform.localScale *= 0.1f;
 							rb.transform.parent = transform;
+							GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+							debugObject.transform.localScale *= 0.1f;
+							debugObject.transform.parent = rb.transform;
+							debugObject.name = "debug";
 						}
 						rb.transform.localPosition = convertToLeftHandPosition(rbody.position);
 						rb.transform.localRotation = convertToLeftHandRotation(rbody.rotation);
-						rb.GetComponent<Renderer>().enabled = showDebugObject;
 						rb.tag = rbody.tracking_valid? "tracked" : "untracked";
+						Transform debugCube = rb.transform.Find("debug");
+						if(debugCube != null) debugCube.GetComponent<Renderer>().enabled = showDebugObject;
 					}
 				}
 				for(int i=0; i<msg.skeletons.Count; i++){
@@ -505,15 +526,19 @@ public class MotiveDirect : MonoBehaviour {
 						if(boneIDtoName.ContainsKey(skeletonID) && boneIDtoName[skeletonID].ContainsKey(boneID)){
 							GameObject bone = GameObject.Find(boneIDtoName[skeletonID][boneID]);
 							if(bone == null){
-								bone = GameObject.CreatePrimitive(PrimitiveType.Cube);
+								bone = new GameObject();
 								bone.name = boneIDtoName[skeletonID][boneID];
-								bone.transform.localScale *=0.1f;
 								bone.transform.parent = sk.transform;
+								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+								debugObject.transform.localScale *= 0.1f;
+								debugObject.transform.parent = bone.transform;
+								debugObject.name = "debug";
 							}
 							bone.transform.localPosition = convertToLeftHandPosition(rbody.position);
 							bone.transform.localRotation = convertToLeftHandRotation(rbody.rotation);
-							bone.GetComponent<Renderer>().enabled = showDebugObject;
 							bone.tag = rbody.tracking_valid? "tracked" : "untracked";
+							Transform debugCube = bone.transform.Find("debug");
+							if(debugCube != null) debugCube.GetComponent<Renderer>().enabled = showDebugObject;
 						}
 					}
 				}
