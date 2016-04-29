@@ -65,9 +65,10 @@ public class MotiveDirect : MonoBehaviour {
 	private Dictionary<int, string> rigidBodyIDtoName = new Dictionary<int, string>();
 	private Dictionary<int, string> skeletonIDtoName = new Dictionary<int, string>();
 	private Dictionary<int, Dictionary<int, string>> boneIDtoName = new Dictionary<int, Dictionary<int, string>>();
-	private Dictionary<string, string> markerSetIDtoName = new Dictionary<string, string>();
-
-
+	private Dictionary<string, Dictionary<int, string>> markerSetIDtoName = new Dictionary<string, Dictionary<int, string>>();
+	private Dictionary<string, Dictionary<int, Transform>> markerSetIDtoTransfrom = new Dictionary<string, Dictionary<int, Transform>>();
+	private Dictionary<string, GameObject> gameObjectDictionary = new Dictionary<string, GameObject>();
+	private List<GameObject> debugObjects = new List<GameObject>();
 	//
 	// Some constants as defined in NatNet SDK example 
 	//
@@ -413,7 +414,6 @@ public class MotiveDirect : MonoBehaviour {
 					currentTimestamp = ((FrameOfData)msg).timestamp;
 				}
 			}
-
 		}
 		catch(System.Exception ex)
 		{
@@ -445,10 +445,14 @@ public class MotiveDirect : MonoBehaviour {
 					boneIDtoName.Clear();
 					foreach (ModelDataset dataset in modelDef.datasets){
 						if(dataset.type == DATASET_MARKERSET){
+							Dictionary<int, string> setDict = null;
+							if(!markerSetIDtoName.TryGetValue(dataset.name, out setDict)){
+								setDict = new Dictionary<int, string>();
+								markerSetIDtoName[dataset.name] = setDict;
+							}
 							int i=0;
 							foreach(string name in dataset.data){
-								string uniqueID = dataset.name + i.ToString();
-								markerSetIDtoName[uniqueID] = name;
+								setDict[i] = name;
 								i++;
 							}
 						}
@@ -459,10 +463,15 @@ public class MotiveDirect : MonoBehaviour {
 						}
 						else if(dataset.type == DATASET_SKELETON){
 							foreach(Dictionary<string, object> sk in dataset.data){
-								if(!boneIDtoName.ContainsKey((int)sk["skid"]))
-									boneIDtoName[(int)sk["skid"]] = new Dictionary<int, string>();
-								boneIDtoName[(int)sk["skid"]][(int)sk["id"]] = (string)sk["bname"];
-								skeletonIDtoName[(int)sk["skid"]] = dataset.name;
+								Dictionary<int, string> skDict = null;
+								int skid = (int)sk["skid"];
+								if(!boneIDtoName.TryGetValue(skid, out skDict)){
+									skDict = new Dictionary<int, string>();
+									boneIDtoName[skid] = skDict;
+								}
+								int boneID = (int)sk["id"];
+								skDict[boneID] = (string)sk["bname"];
+								skeletonIDtoName[skid] = dataset.name;
 							}
 						}
 						else{
@@ -490,83 +499,111 @@ public class MotiveDirect : MonoBehaviour {
 			if(dataBufferHead !=-1){ // skip if no data comes in
 				FrameOfData msg = dataBuffer[dataBufferHead];
 				foreach(KeyValuePair<string, ArrayList> element in msg.sets){
-					GameObject mSet = GameObject.Find(element.Key + "_set");
-					if(mSet == null) mSet = new GameObject(element.Key + "_set");
-					mSet.transform.parent = transform;
-					int i=0;
-					foreach(Vector3 marker in element.Value){
-						string uniqueID = element.Key + i.ToString();
-						if(markerSetIDtoName.ContainsKey(uniqueID)){
-							GameObject mk = GameObject.Find(element.Key + "_" + markerSetIDtoName[uniqueID]);
-							if(mk == null){ 
-								mk = new GameObject();
-								mk.name = element.Key + "_" + markerSetIDtoName[uniqueID];
-								mk.transform.parent = mSet.transform;
-								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-								debugObject.transform.localScale *= 0.02f;
-								debugObject.transform.parent = mk.transform;
-								debugObject.name = "debug";
-							}
-							mk.transform.localPosition = convertToLeftHandPosition(marker);
-							Transform debugSphere = mk.transform.Find("debug");
-							if(debugSphere != null) debugSphere.GetComponent<Renderer>().enabled = showDebugObject;
+					GameObject mSet = null;
+					string setName = string.Concat(element.Key, "_set");
+					if(!gameObjectDictionary.TryGetValue(setName, out mSet)){
+						mSet = GameObject.Find(setName);
+						if(mSet == null){
+							mSet = new GameObject(setName);
+							mSet.transform.parent = transform;
 						}
-						i++;
+						gameObjectDictionary[setName] = mSet;
+					}
+					Dictionary<int, Transform> transformDict = null;
+					if(!markerSetIDtoTransfrom.TryGetValue(element.Key, out transformDict)){
+						transformDict = new Dictionary<int, Transform>();
+						markerSetIDtoTransfrom[element.Key] = transformDict;
+					}
+					Dictionary<int, string> nameDict = null;
+					if(markerSetIDtoName.TryGetValue(element.Key, out nameDict)){
+						int i=0;
+						foreach(Vector3 marker in element.Value){
+							string mkName = "";
+							if(nameDict.TryGetValue(i, out mkName)){
+								Transform mkTransform =  null;
+								if(!transformDict.TryGetValue(i, out mkTransform)){
+									mkTransform =  mSet.transform.Find(mkName);
+									if (mkTransform == null){
+										GameObject mk = new GameObject(mkName);
+										mk.transform.parent = mSet.transform;
+										GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+										debugObject.transform.localScale *= 0.02f;
+										debugObject.transform.parent = mk.transform;
+										debugObject.name = "debug";
+										debugObjects.Add(debugObject);
+										mkTransform = mk.transform;
+									}
+									transformDict[i] = mkTransform;
+								}
+								mkTransform.localPosition = convertToLeftHandPosition(marker);	
+							}
+							i++;
+						}
 					}
 				}
 				for(int i=0; i<msg.rigid_bodies.Count; i++){
 					RigidBody rbody = (RigidBody)msg.rigid_bodies[i];
-					if(rigidBodyIDtoName.ContainsKey(rbody.id)){
-						GameObject rb = GameObject.Find(rigidBodyIDtoName[rbody.id]);
-						if(rb == null){ 
-							rb = new GameObject();
-							rb.name = rigidBodyIDtoName[rbody.id];
-							rb.transform.parent = transform;
-							GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-							debugObject.transform.localScale *= 0.1f;
-							debugObject.transform.parent = rb.transform;
-							debugObject.name = "debug";
+					GameObject rb = null;
+					string rbName = "";
+					if(rigidBodyIDtoName.TryGetValue(rbody.id, out rbName)){
+						if(!gameObjectDictionary.TryGetValue(rbName, out rb)){
+							rb = GameObject.Find(rbName);
+							if(rb == null){
+								rb = new GameObject(rbName);
+								rb.transform.parent = transform;
+								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+								debugObject.transform.localScale *= 0.1f;
+								debugObject.transform.parent = rb.transform;
+								debugObject.name = "debug";
+								debugObjects.Add(debugObject);
+							}
+							gameObjectDictionary[rbName] = rb;
 						}
 						rb.transform.localPosition = convertToLeftHandPosition(rbody.position);
 						rb.transform.localRotation = convertToLeftHandRotation(rbody.rotation);
 						rb.tag = rbody.tracking_valid? "tracked" : "untracked";
-						Transform debugCube = rb.transform.Find("debug");
-						if(debugCube != null) debugCube.GetComponent<Renderer>().enabled = showDebugObject;
 					}
 				}
 				for(int i=0; i<msg.skeletons.Count; i++){
 					Skeleton skeleton = (Skeleton)msg.skeletons[i];
 					GameObject sk = null;
-					if(skeletonIDtoName.ContainsKey(skeleton.id)){
-						sk = GameObject.Find(skeletonIDtoName[skeleton.id]);
-						if(sk == null){
-							sk = new GameObject();
-							sk.name = skeletonIDtoName[skeleton.id];
-							sk.transform.parent = transform;
-							sk.transform.localPosition = Vector3.zero;
-							sk.transform.localRotation = Quaternion.identity;
+					string skName = "";
+					if(skeletonIDtoName.TryGetValue(skeleton.id, out skName)){
+						if(!gameObjectDictionary.TryGetValue(skName, out sk)){
+							sk = GameObject.Find(skName);
+							if(sk == null){
+								sk = new GameObject(skName);
+								sk.transform.parent = transform;
+								sk.transform.localPosition = Vector3.zero;
+								sk.transform.localRotation = Quaternion.identity;
+							}
+							gameObjectDictionary[skName] = sk;
 						}
 					}
 					for(int j=0; j< skeleton.rigid_bodies.Count ;j++){
 						RigidBody rbody = (RigidBody)skeleton.rigid_bodies[j];
 						int skeletonID = HighWord(rbody.id);
 						int boneID = LowWord(rbody.id);
-						if(boneIDtoName.ContainsKey(skeletonID) && boneIDtoName[skeletonID].ContainsKey(boneID)){
-							GameObject bone = GameObject.Find(boneIDtoName[skeletonID][boneID]);
-							if(bone == null){
-								bone = new GameObject();
-								bone.name = boneIDtoName[skeletonID][boneID];
-								bone.transform.parent = sk.transform;
-								GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-								debugObject.transform.localScale *= 0.1f;
-								debugObject.transform.parent = bone.transform;
-								debugObject.name = "debug";
+						Dictionary<int, string> skeletonDict = null;
+						string boneName = "";
+						GameObject bone = null;
+						if(boneIDtoName.TryGetValue(skeletonID, out skeletonDict) && skeletonDict.TryGetValue(boneID, out boneName)){
+							if(!gameObjectDictionary.TryGetValue(boneName, out bone)){
+								bone = GameObject.Find(boneName);
+								if(bone == null){
+									bone = new GameObject(boneName);
+									bone.transform.parent = sk.transform;
+									GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+									debugObject.transform.localScale *= 0.1f;
+									debugObject.transform.parent = bone.transform;
+									debugObject.name = "debug";
+									debugObjects.Add(debugObject);
+								}
+								gameObjectDictionary[boneName] = bone;
 							}
 							bone.transform.localPosition = convertToLeftHandPosition(rbody.position);
 							bone.transform.localRotation = convertToLeftHandRotation(rbody.rotation);
 							bone.tag = rbody.tracking_valid? "tracked" : "untracked";
-							Transform debugCube = bone.transform.Find("debug");
-							if(debugCube != null) debugCube.GetComponent<Renderer>().enabled = showDebugObject;
 						}
 					}
 				}
@@ -578,6 +615,11 @@ public class MotiveDirect : MonoBehaviour {
 		if(modelDefTimer<=0){
 			modelDefUpdated = false;
 			modelDefTimer = updateModelDefTime;
+		}
+
+		//show debug objects
+		foreach(GameObject debugObject in debugObjects){
+			debugObject.SetActive(showDebugObject);
 		}
 	}
 
