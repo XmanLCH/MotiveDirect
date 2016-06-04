@@ -498,7 +498,79 @@ public class MotiveDirect : MonoBehaviour {
 		lock(syncLock){
 			if(dataBufferHead !=-1){ // skip if no data comes in
 				FrameOfData msg = dataBuffer[dataBufferHead];
-				foreach(KeyValuePair<string, ArrayList> element in msg.sets){
+
+                //create markers that are not in rigidbodies/skeletons/markersets.
+                {
+                    GameObject mSet = null;
+                    string setPrefix = "other";
+                    string setName = string.Concat(setPrefix, "_set");
+                    if (!gameObjectDictionary.TryGetValue(setName, out mSet))
+                    {
+                        mSet = GameObject.Find(setName);
+                        if (mSet == null)
+                        {
+                            mSet = new GameObject(setName);
+                            mSet.transform.parent = transform;
+                        }
+                        gameObjectDictionary[setName] = mSet;
+                    }
+                    Dictionary<int, Transform> transformDict = null;
+                    if (!markerSetIDtoTransfrom.TryGetValue(setPrefix, out transformDict))
+                    {
+                        transformDict = new Dictionary<int, Transform>();
+                        markerSetIDtoTransfrom[setPrefix] = transformDict;
+                    }
+                    // clean the tracking flag 
+                    foreach(Transform mkTransform in transformDict.Values)
+                    {
+                        mkTransform.tag = "untracked";
+                    }
+                    foreach (LabeledMarker lmk in msg.labeled_markers)
+                    {
+                        int setID = HighWord(lmk.id);
+                        int mkID = LowWord(lmk.id);
+                        if (setID != 0) continue; //skip markers that are already included in rigidbodies/skeletons/marker sets.
+                        
+                        string mkName = string.Concat(setPrefix,"_", mkID.ToString());
+                        Transform mkTransform = null;
+                        if (!transformDict.TryGetValue(mkID, out mkTransform))
+                        {
+                            mkTransform = mSet.transform.Find(mkName);
+                            if (mkTransform == null)
+                            {
+                                GameObject mk = new GameObject(mkName);
+                                mk.transform.parent = mSet.transform;
+                                GameObject debugObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                                debugObject.transform.localScale *= 0.02f;
+                                debugObject.transform.parent = mk.transform;
+                                debugObject.name = "debug";
+                                debugObjects.Add(debugObject);
+                                mkTransform = mk.transform;
+                            }
+                            transformDict[mkID] = mkTransform;
+                        }
+                        mkTransform.tag = "tracked";
+                        mkTransform.localPosition = convertToLeftHandPosition(lmk.position);
+                    }
+                    List<int> idToDelete = new List<int>();
+                    foreach (KeyValuePair<int, Transform> element in transformDict)
+                    {
+                        Transform mk = element.Value;
+                        if (mk.CompareTag("untracked")){
+                            Transform debugTransform = mk.FindChild("debug");
+                            if(debugTransform != null)debugObjects.Remove(debugTransform.gameObject);
+                            Destroy(element.Value.gameObject);
+                            idToDelete.Add(element.Key);
+                        }
+                    }
+                    foreach(int i in idToDelete)
+                    {
+                        transformDict.Remove(i);
+                    }
+                }
+
+                //create markers that are in rigidbodies/skeletons/markersets
+                foreach (KeyValuePair<string, ArrayList> element in msg.sets){
 					GameObject mSet = null;
 					string setName = string.Concat(element.Key, "_set");
 					if(!gameObjectDictionary.TryGetValue(setName, out mSet)){
@@ -541,6 +613,7 @@ public class MotiveDirect : MonoBehaviour {
 						}
 					}
 				}
+                //create rigidbodies
 				for(int i=0; i<msg.rigid_bodies.Count; i++){
 					RigidBody rbody = (RigidBody)msg.rigid_bodies[i];
 					GameObject rb = null;
@@ -564,6 +637,7 @@ public class MotiveDirect : MonoBehaviour {
 						rb.tag = rbody.tracking_valid? "tracked" : "untracked";
 					}
 				}
+                //create skeletons
 				for(int i=0; i<msg.skeletons.Count; i++){
 					Skeleton skeleton = (Skeleton)msg.skeletons[i];
 					GameObject sk = null;
